@@ -89,11 +89,8 @@ const toLine = (l: Record<string, any>, names: Map<number, string>): LoanLine =>
 
 export type OverdueLoan = Loan & { daysLate: number };
 
-/** Open/partial loans past their date, with only the not-yet-returned lines. */
-export async function overdueLoans(today: string): Promise<Loan[]> {
-  const due = await openLoanDueDates();
-  const overdueIds = [...due].filter(([, d]) => d < today).map(([id]) => id);
-  if (!overdueIds.length) return [];
+/** Open/partial loans (oldest due date first), with only the not-yet-returned lines. */
+export async function activeLoans(): Promise<Loan[]> {
   const [loanRows, lineRows, names] = await Promise.all([
     Promise.all(
       ["Open", "Deels"].map((s) => listRows(tables.loans(), { [`filter__${F.loan.status}__contains`]: s })),
@@ -102,14 +99,48 @@ export async function overdueLoans(today: string): Promise<Loan[]> {
     materialNames(),
   ]);
   return loanRows
-    .filter((r) => overdueIds.includes(r.id))
     .map((r) =>
       toLoan(
         r,
         lineRows.filter((l) => l[F.line.loan]?.[0]?.id === r.id).map((l) => toLine(l, names)).filter((l) => l.qty > l.returned),
       ),
     )
-    .filter((l) => l.lines.length);
+    .filter((l) => l.lines.length)
+    .sort((a, b) => a.due.localeCompare(b.due) || a.id - b.id);
+}
+
+/** Open/partial loans past their date, with only the not-yet-returned lines. */
+export async function overdueLoans(today: string): Promise<Loan[]> {
+  return (await activeLoans()).filter((l) => l.due < today);
+}
+
+/**
+ * Register a (partial) return. `back` maps line id -> total units back so far (not a delta).
+ * Status becomes "Terug" (or "Beschadigd" if `damaged`) once every line is complete, else "Deels terug".
+ */
+export async function returnLoan(loanId: number, back: Record<number, number>, damaged = false): Promise<LoanStatus> {
+  const lines = await listRows(tables.lines(), { [`filter__${F.line.loan}__link_row_has`]: String(loanId) });
+  if (!lines.length) throw new LoanError("Lening niet gevonden.", 404);
+
+  const updates: { id: number; [k: string]: unknown }[] = [];
+  let complete = true;
+  for (const l of lines) {
+    const qty = Number(l[F.line.qty]);
+    const now = back[l.id] ?? Number(l[F.line.back] || 0);
+    if (!Number.isInteger(now) || now < 0 || now > qty) throw new LoanError("Ongeldig aantal.");
+    if (now !== Number(l[F.line.back] || 0)) updates.push({ id: l.id, [F.line.back]: now });
+    if (now < qty) complete = false;
+  }
+  for (const id of Object.keys(back).map(Number))
+    if (!lines.some((l) => l.id === id)) throw new LoanError("Regel hoort niet bij deze lening.");
+
+  const status: LoanStatus = !complete ? "Deels terug" : damaged ? "Beschadigd" : "Terug";
+  await updateRows(tables.lines(), updates);
+  await updateRows(tables.loans(), [
+    { id: loanId, [F.loan.status]: status, ...(complete ? { [F.loan.returnedOn]: todayNL() } : {}) },
+  ]);
+  invalidateCatalog();
+  return status;
 }
 
 export const markReminded = (loanIds: number[], today: string) =>
