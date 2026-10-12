@@ -1,5 +1,4 @@
 import "server-only";
-import { randomBytes } from "node:crypto";
 import { createRow, createRows, deleteRows, listRows, tables, updateRows } from "./baserow";
 import { getCatalog, invalidateCatalog, openLoanDueDates } from "./catalog";
 import { addDays, isWeekend, todayNL } from "./dates";
@@ -42,18 +41,16 @@ export async function createLoan(input: NewLoan): Promise<Loan> {
       );
   }
 
-  const token = randomBytes(18).toString("base64url");
   const loan = await createRow(tables.loans(), {
     [F.loan.name]: name,
     [F.loan.email]: email,
     [F.loan.due]: input.due,
     [F.loan.status]: "Open",
-    [F.loan.token]: token,
   });
   try {
     await createRows(
       tables.lines(),
-      [...wanted].map(([mat, qty]) => ({ [F.line.loan]: [loan.id], [F.line.mat]: [mat], [F.line.qty]: qty, [F.line.back]: 0 })),
+      [...wanted].map(([mat, qty]) => ({ [F.line.title]: `Lening van ${name}`, [F.line.loan]: [loan.id], [F.line.mat]: [mat], [F.line.qty]: qty, [F.line.back]: 0 })),
     );
   } catch (e) {
     await deleteRows(tables.loans(), [loan.id]).catch(() => {});
@@ -63,7 +60,7 @@ export async function createLoan(input: NewLoan): Promise<Loan> {
   const lines = [...wanted].map(([mat, qty], i) => ({
     id: i, materialId: mat, name: catalog.items.find((x) => x.id === mat)!.name, qty, returned: 0,
   }));
-  return { id: loan.id, number: String(loan[F.loan.number] ?? ""), name, email, due: input.due, status: "Open", token, lastReminder: null, lines };
+  return { id: loan.id, number: String(loan[F.loan.number] ?? ""), name, email, due: input.due, status: "Open", lastReminder: null, lines };
 }
 
 const toLoan = (r: Record<string, any>, lines: LoanLine[]): Loan => ({
@@ -73,7 +70,6 @@ const toLoan = (r: Record<string, any>, lines: LoanLine[]): Loan => ({
   email: String(r[F.loan.email] ?? ""),
   due: String(r[F.loan.due] ?? ""),
   status: (r[F.loan.status]?.value ?? r[F.loan.status] ?? "Open") as LoanStatus,
-  token: String(r[F.loan.token] ?? ""),
   lastReminder: r[F.loan.lastReminder] || null,
   lines,
 });
@@ -90,31 +86,6 @@ const toLine = (l: Record<string, any>, names: Map<number, string>): LoanLine =>
   qty: Number(l[F.line.qty]),
   returned: Number(l[F.line.back] || 0),
 });
-
-export async function getLoanByToken(token: string): Promise<Loan | null> {
-  if (!/^[\w-]{10,64}$/.test(token)) return null;
-  const rows = await listRows(tables.loans(), { [`filter__${F.loan.token}__equal`]: token });
-  const row = rows[0];
-  if (!row) return null;
-  const [lines, names] = await Promise.all([
-    listRows(tables.lines(), { [`filter__${F.line.loan}__link_row_has`]: String(row.id) }),
-    materialNames(),
-  ]);
-  return toLoan(row, lines.map((l) => toLine(l, names)));
-}
-
-/** Set returned amounts per line id; status follows from the totals (or is forced, e.g. Beschadigd). */
-export async function applyReturn(loan: Loan, returned: Map<number, number>, forceStatus?: LoanStatus): Promise<LoanStatus> {
-  const next = loan.lines.map((l) => ({ ...l, returned: Math.max(0, Math.min(l.qty, returned.get(l.id) ?? l.returned)) }));
-  const done = next.every((l) => l.returned >= l.qty);
-  const status: LoanStatus = forceStatus ?? (done ? "Terug" : next.some((l) => l.returned > 0) ? "Deels terug" : "Open");
-  await updateRows(tables.lines(), next.map((l) => ({ id: l.id, [F.line.back]: l.returned })));
-  await updateRows(tables.loans(), [
-    { id: loan.id, [F.loan.status]: status, [F.loan.returnedOn]: status === "Open" || status === "Deels terug" ? null : todayNL() },
-  ]);
-  invalidateCatalog();
-  return status;
-}
 
 export type OverdueLoan = Loan & { daysLate: number };
 

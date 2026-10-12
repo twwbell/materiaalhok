@@ -36,7 +36,6 @@ export type Loan = {
   email: string;
   due: string;
   status: LoanStatus;
-  token: string;
   lastReminder: string | null;
   lines: LoanLine[];
 };

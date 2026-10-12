@@ -21,8 +21,7 @@ Next.js 16 (App Router, TypeScript) · Baserow REST API (server-side only) · Re
    |---|---|
    | `BASEROW_URL`, `BASEROW_TOKEN` | Baserow host and database token |
    | `BASEROW_TABLE_CATEGORIEEN` / `_MATERIAAL` / `_LENINGEN` / `_LEENREGELS` | table ids |
-   | `APP_URL` | public URL, used for admin links in mails |
-   | `RESEND_API_KEY`, `MAIL_FROM` | mail (without a key, mails are logged to the console) |
+      | `RESEND_API_KEY`, `MAIL_FROM` | mail (without a key, mails are logged to the console) |
    | `ADMIN_EMAIL` | reply-to on all mails + daily overdue overview |
    | `CRON_SECRET` | protects `/api/cron/reminders` |
    | `MAX_DAYS` | furthest selectable return date (default 14) |
@@ -30,14 +29,13 @@ Next.js 16 (App Router, TypeScript) · Baserow REST API (server-side only) · Re
 
 ## Managing (in Baserow)
 - **Stock / items / photos:** edit `Materiaal` (`Voorraad`, `Foto`, `Actief`). Photos use Baserow's thumbnails in lists, the original on the detail page. Category order: `Volgorde`.
-- **Returns:** via the admin links in mail 1 (`/beheer/<token>`: all back, partly back with amounts per item, damaged), or directly in Baserow. If you only change `Status` there, also set `Aantal terug`; availability is computed from open loans' `Aantal − Aantal terug`.
+- **Returns:** directly in Baserow. If you only change `Single select` there, also set `Aantal terug`; availability is computed from open loans' `Aantal − Aantal terug`.
 - "Beschadigd" counts everything as returned; adjust `Voorraad` yourself if items are lost.
 
 ## How it works
 - Availability = `Voorraad` − outstanding units of loans with status Open/Deels terug, computed server-side, cached 30 s (and dropped on every loan/return). Re-checked without cache when a loan is created; if something was lent in the meantime the lender gets a message and a refreshed basket.
 - Baserow has no transactions: loan row first, then the lines in one batch call; on failure the loan row is deleted.
-- **Cron:** `vercel.json` calls `/api/cron/reminders` at 05:30 and 06:30 UTC; the route only proceeds when it is 07:xx in Amsterdam (so it's 07:30 year-round) and skips loans already reminded today (`Laatste herinnering`). Auth: `Authorization: Bearer $CRON_SECRET` (Vercel adds it when `CRON_SECRET` is set). Manual run: `curl -H "Authorization: Bearer $CRON_SECRET" "$APP_URL/api/cron/reminders?force=1"`.
-- Admin links are unguessable per-loan tokens, no login. The action buttons are POST forms so mail scanners that open links can't mark loans returned.
+- **Cron:** `vercel.json` calls `/api/cron/reminders` at 05:30 and 06:30 UTC; the route only proceeds when it is 07:xx in Amsterdam (so it's 07:30 year-round) and skips loans already reminded today (`Laatste herinnering`). Auth: `Authorization: Bearer $CRON_SECRET` (Vercel adds it when `CRON_SECRET` is set). Manual run: `curl -H "Authorization: Bearer $CRON_SECRET" "<site-url>/api/cron/reminders?force=1"`.
 
 ## Not verified
 Built and type-checked (`npm run build`), but not yet run against a live Baserow instance or Resend account. Check on first run: the setup script (Baserow versions differ slightly in table/field API details), the `Status contains` and `Uitstaand higher_than` filters, and mail delivery.

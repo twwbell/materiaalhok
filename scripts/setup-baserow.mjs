@@ -54,9 +54,9 @@ await field(mat.id, { name: "Actief", type: "boolean" });
 await api(`/api/database/fields/${loan.primaryId}/`, "PATCH", { name: "Nummer", type: "autonumber" });
 await field(loan.id, { name: "Naam lener", type: "text" });
 await field(loan.id, { name: "E-mail", type: "email" });
-await field(loan.id, { name: "Terugbrengen vóór", type: "date", date_format: "ISO" });
+await field(loan.id, { name: "Terugbrengen voor", type: "date", date_format: "ISO" });
 await field(loan.id, {
-  name: "Status",
+  name: "Single select",
   type: "single_select",
   select_options: [
     { value: "Open", color: "light-blue" },
@@ -65,9 +65,8 @@ await field(loan.id, {
     { value: "Beschadigd", color: "light-red" },
   ],
 });
-await field(loan.id, { name: "Aangemaakt", type: "created_on", date_include_time: true, date_format: "ISO" });
+await field(loan.id, { name: "Aangemaakt op", type: "created_on", date_include_time: true, date_format: "ISO" });
 await field(loan.id, { name: "Teruggemeld op", type: "date", date_format: "ISO" });
-await field(loan.id, { name: "Beheertoken", type: "text" });
 await field(loan.id, { name: "Laatste herinnering", type: "date", date_format: "ISO" });
 
 // Leenregels: primary is a formula-less text we leave empty; keep it for Baserow's requirement.
@@ -75,7 +74,7 @@ await field(line.id, { name: "Lening", type: "link_row", link_row_table_id: loan
 await field(line.id, { name: "Materiaal", type: "link_row", link_row_table_id: mat.id, has_related_field: false });
 await field(line.id, { name: "Aantal", type: "number", number_decimal_places: 0 });
 await field(line.id, { name: "Aantal terug", type: "number", number_decimal_places: 0 });
-await field(line.id, { name: "Uitstaand", type: "formula", formula: "field('Aantal') - field('Aantal terug')" });
+await field(line.id, { name: "Formula", type: "formula", formula: "field('Aantal') - field('Aantal terug')" });
 
 if (sample) {
   console.log("Adding example data…");
@@ -98,7 +97,7 @@ if (sample) {
     return d.toISOString().slice(0, 10);
   };
   const l = await rows(loan.id, [
-    { "Naam lener": "Voorbeeld Docent", "E-mail": "docent@example.nl", "Terugbrengen vóór": nextWeekday(3), Status: "Open", Beheertoken: "voorbeeld-token-1" },
+    { "Naam lener": "Voorbeeld Docent", "E-mail": "docent@example.nl", "Terugbrengen voor": nextWeekday(3), "Single select": "Open" },
   ]);
   await rows(line.id, [
     { Lening: [l.items[0].id], Materiaal: [idOf("Bok")], Aantal: 1, "Aantal terug": 0 },

@@ -1,12 +1,26 @@
 import "server-only";
+import nodemailer, { type Transporter } from "nodemailer";
 import { diffDays, fmtLong, fmtShort } from "./dates";
 import type { Loan } from "./types";
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 const first = (name: string) => name.trim().split(/\s+/)[0] || "";
-const appUrl = () => (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+
+let smtp: Transporter | undefined;
+const smtpTransport = () =>
+  (smtp ??= nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT ?? 587),
+    secure: Number(process.env.SMTP_PORT) === 465,
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+  }));
 
 async function send(to: string, subject: string, html: string, replyTo?: string) {
+  const from = process.env.MAIL_FROM ?? "Materiaalhok <onboarding@resend.dev>";
+  if (process.env.SMTP_HOST) {
+    await smtpTransport().sendMail({ from, to, subject, html, ...(replyTo ? { replyTo } : {}) });
+    return;
+  }
   const key = process.env.RESEND_API_KEY;
   if (!key) {
     console.log(`[mail:dev] to=${to} subject=${subject}`);
@@ -16,7 +30,7 @@ async function send(to: string, subject: string, html: string, replyTo?: string)
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      from: process.env.MAIL_FROM ?? "Materiaalhok <onboarding@resend.dev>",
+      from,
       to,
       subject,
       html,
@@ -43,7 +57,6 @@ const itemRows = (lines: { name: string; qty: number }[]) =>
     .join("")}</table>`;
 
 export async function sendLoanConfirmation(loan: Loan) {
-  const link = (anchor: string) => `${appUrl()}/beheer/${loan.token}#${anchor}`;
   const html = shell(
     { bg: "#5b2a86", fg: "#fff", kicker: "Materiaalhok", kickerColor: "#f1d58a", title: `Hoi ${esc(first(loan.name))}, veel plezier met de les!` },
     `<div style="padding:14px 16px;border-radius:14px;background:#f8ecc9">
@@ -55,9 +68,7 @@ ${itemRows(loan.lines)}
 <li>Zelf terugbrengen naar het materiaalhok, niet in een lokaal of de gang.</li>
 <li>In goede staat: schoon, compleet en opgeruimd.</li>
 <li>Niet doorlenen. Jij blijft verantwoordelijk.</li>
-<li>Te laat? Je krijgt elke ochtend een herinnering.</li></ul>
-<div style="font-size:12px;color:#8a8096;padding-top:12px;border-top:1px dashed #ddd3e2">Alleen voor de beheerder:
-<a href="${link("terug")}" style="color:#5b2a86">Alles terug</a> · <a href="${link("deels")}" style="color:#5b2a86">Deels terug</a> · <a href="${link("beschadigd")}" style="color:#5b2a86">Beschadigd</a></div>`,
+<li>Te laat? Je krijgt elke ochtend een herinnering.</li></ul>`,
   );
   await send(loan.email, `Je hebt materiaal geleend, terug vóór ${fmtShort(loan.due)}`, html, process.env.ADMIN_EMAIL);
 }
@@ -80,8 +91,7 @@ export async function sendAdminOverview(loans: Loan[], today: string) {
   if (!to || !loans.length) return;
   const rows = loans
     .map((l) => `<p style="margin:0 0 12px"><strong>${esc(l.name)}</strong> (${esc(l.email)}) · ${diffDays(today, l.due)} dag(en) te laat<br>
-${l.lines.map((x) => `${x.qty - x.returned}× ${esc(x.name)}`).join(", ")}<br>
-<a href="${appUrl()}/beheer/${l.token}" style="color:#5b2a86">Terugmelden</a></p>`)
+${l.lines.map((x) => `${x.qty - x.returned}× ${esc(x.name)}`).join(", ")}</p>`)
     .join("");
   await send(
     to,

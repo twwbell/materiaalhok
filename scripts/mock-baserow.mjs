@@ -14,12 +14,12 @@ ITEMS.forEach(([n, c, s]) => add(2, { Naam: n, Categorie: [{ id: c + 1, value: C
 const sel = (v) => ({ id: 1, value: v, color: "x" });
 const expand = (t, row) => {
   const r = { ...row };
-  if (t === 3) { r.Nummer = String(row.id); r.Status = sel(row.Status); r["Terugbrengen vóór"] = row["Terugbrengen vóór"] ?? null; }
+  if (t === 3) { r.Nummer = String(row.id); r["Single select"] = sel(row["Single select"]); r["Terugbrengen voor"] = row["Terugbrengen voor"] ?? null; }
   if (t === 4) {
     r.Lening = (row.Lening ?? []).map((id) => ({ id, value: String(id) }));
     r.Materiaal = (row.Materiaal ?? []).map((id) => ({ id, value: db[2].find((m) => m.id === id)?.Naam }));
     r.Aantal = String(row.Aantal); r["Aantal terug"] = String(row["Aantal terug"] ?? 0);
-    r.Uitstaand = String(Number(row.Aantal) - Number(row["Aantal terug"] ?? 0));
+    r.Formula = String(Number(row.Aantal) - Number(row["Aantal terug"] ?? 0));
   }
   return r;
 };
