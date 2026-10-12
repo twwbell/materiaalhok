@@ -61,7 +61,7 @@ export async function sendLoanConfirmation(loan: Loan) {
     { bg: "#5b2a86", fg: "#fff", kicker: "Materiaalhok", kickerColor: "#f1d58a", title: `Hoi ${esc(first(loan.name))}, veel plezier met de les!` },
     `<div style="padding:14px 16px;border-radius:14px;background:#f8ecc9">
 <div style="font:700 12px Lexend,Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#7a5a08">Jouw afspraak</div>
-<div style="font:700 19px Lexend,Arial,sans-serif">Terug in het hok vóór ${esc(fmtLong(loan.due))}</div></div>
+<div style="font:700 19px Lexend,Arial,sans-serif">Uiterlijk terug in het hok op ${esc(fmtLong(loan.due))}</div></div>
 ${itemRows(loan.lines)}
 <p style="color:#463d52;margin:0 0 16px">Breng alles zelf terug, schoon en compleet. Kapot of kwijt? Reageer op deze mail.</p>
 <ul style="color:#463d52;padding-left:18px;margin:0 0 16px;font-size:14px">
@@ -70,7 +70,7 @@ ${itemRows(loan.lines)}
 <li>Niet doorlenen. Jij blijft verantwoordelijk.</li>
 <li>Te laat? Je krijgt elke ochtend een herinnering.</li></ul>`,
   );
-  await send(loan.email, `Je hebt materiaal geleend, terug vóór ${fmtShort(loan.due)}`, html, process.env.ADMIN_EMAIL);
+  await send(loan.email, `Je hebt materiaal geleend, uiterlijk terug op ${fmtShort(loan.due)}`, html, process.env.ADMIN_EMAIL);
 }
 
 export async function sendReminder(loan: Loan, today: string) {
@@ -78,7 +78,7 @@ export async function sendReminder(loan: Loan, today: string) {
   const head = loan.lines[0].name.toLowerCase() + (loan.lines.length > 1 ? " (en meer)" : "");
   const html = shell(
     { bg: "#d9a21b", fg: "#221a33", kicker: `Herinnering · dag ${days}`, kickerColor: "#221a33", title: `${esc(first(loan.name))}, we missen nog iets in het hok` },
-    `<p style="margin:0 0 8px;color:#463d52">Je zou de spullen vóór ${esc(fmtLong(loan.due))} terugbrengen. Ze zijn nog niet teruggemeld.</p>
+    `<p style="margin:0 0 8px;color:#463d52">Je zou de spullen uiterlijk op ${esc(fmtLong(loan.due))} terugbrengen. Ze zijn nog niet teruggemeld.</p>
 ${itemRows(loan.lines.map((l) => ({ name: l.name, qty: l.qty - l.returned })))}
 <p style="color:#463d52">Breng ze vandaag terug. Weet je niet meer waar ze zijn, of is er iets kapot? Reageer op deze mail.</p>
 <div style="font-size:12px;color:#8a8096">Je ontvangt deze mail elke ochtend tot alles is teruggemeld.</div>`,

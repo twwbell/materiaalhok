@@ -176,7 +176,7 @@ export default function App({ initial }: { initial: Catalog }) {
     };
   });
   const errName = tried && !form.name.trim(), errEmail = tried && !EMAIL_RE.test(form.email.trim()), errDate = tried && !form.date;
-  const pledge = `Ik, ${form.name.trim() || "…"}, breng ${cartCount === 1 ? "dit" : `deze ${cartCount} items`} zelf terug naar het materiaalhok vóór ${form.date ? fmtLong(form.date) : "[datum]"}.`;
+  const pledge = `Ik, ${form.name.trim() || "…"}, breng ${cartCount === 1 ? "dit" : `deze ${cartCount} items`} zelf terug naar het materiaalhok uiterlijk op ${form.date ? fmtLong(form.date) : "[datum]"}.`;
 
   const submit = async () => {
     if (submitting.current) return;
@@ -475,7 +475,7 @@ export default function App({ initial }: { initial: Catalog }) {
           <div className="check-c"><Check size={28} strokeWidth={3} /></div>
           <div style={{ font: "700 16px var(--head)" }}>Gelukt, {done.name.split(/\s+/)[0] || "top"}. Afgesproken:</div>
           <div>
-            <div style={{ font: "700 13px var(--head)", letterSpacing: ".08em", textTransform: "uppercase" }}>Terug in het hok vóór</div>
+            <div style={{ font: "700 13px var(--head)", letterSpacing: ".08em", textTransform: "uppercase" }}>Uiterlijk terug in het hok op</div>
             <div className="date">{fmtLong(done.date)}</div>
           </div>
         </div>
